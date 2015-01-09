@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CA Telemetry Dashboard</title>
+  <link rel="stylesheet" type="text/css" href="index.css">
+  <script src="https://telemetry.mozilla.org/v1/telemetry.js"></script>
+  <script src="index.js" type="application/javascript;version=1.7"></script>
+</head>
+<body>
+  <form id="versions" onchange="updateTable();">
+  </form>
+  <table>
+    <thead>
+      <tr>
+        <th>CA Name</th>
+        <th>Successful Verifications</th>
+        <th>Pinning Failures</th>
+      </tr>
+    </thead>
+    <tbody id="table"></tbody>
+  </table>
+</body>

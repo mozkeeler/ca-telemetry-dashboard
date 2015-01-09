@@ -1,0 +1,15 @@
+tr.noFailures {
+  background-color: green;
+}
+
+tr.unusedCA{
+  background-color: yellow;
+}
+
+tr.onlyFailures {
+  background-color: red;
+}
+
+tr.someFailures {
+  background-color: orange;
+}
