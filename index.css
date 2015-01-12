@@ -1,24 +1,24 @@
 tr.noFailures {
-  background-color: greenyellow;
+  background-color: #4EDA57;
 }
 
 tr.unusedCA{
-  background-color: gold;
+  background-color: #4294D5;
 }
 
 tr.onlyFailures {
-  background-color: tomato;
+  background-color: #FF5F5B;
 }
 
 tr.someFailures {
-  background-color: orange;
+  background-color: #FFE15B;
 }
 
 #versions {
-  width: 12%;
+  width: 14%;
   float: left;
 }
 
 #legend {
-  margin-left: 12%;
+  margin-left: 14%;
 }
