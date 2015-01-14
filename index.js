@@ -22,17 +22,22 @@ req.send();
 // A list of Entry
 let entries = [];
 
+let sortField = "telemetryID";
+let sortDirection = 1;
+
 // name: the name of the CA in question
 // successCounts: a map of version -> successful validation count
 // failureCounts: a map of version -> pinning failure count
-function Entry(name) {
+function Entry(name, id) {
   this.name = formatName(name);
+  this.telemetryID = id;
   this.successCounts = {};
   this.failureCounts = {};
 }
 
 Entry.prototype = {
   name: '',
+  telemetryID: -1,
   successCounts: null,
   failureCounts: null,
   getEnabledSuccesses: function() {
@@ -89,7 +94,7 @@ function loadData(version, measure) {
     histogram.each(function(count, start, end, index) {
       if (index < roots.maxBin) {
         if (!entries[index]) {
-          entries[index] = new Entry(roots.roots[index].label);
+          entries[index] = new Entry(roots.roots[index].label, index);
         }
         if (measure == "CERT_VALIDATION_SUCCESS_BY_CA") {
           if (entries[index].successCounts[version]) {
@@ -106,6 +111,7 @@ function loadData(version, measure) {
         }
       }
     });
+    setSortIndicator();
     updateTable();
   });
 }
@@ -115,27 +121,87 @@ function versionIsEnabled(version) {
   return checkbox.checked;
 }
 
+function compareEntries(a, b) {
+  let aVal;
+  let bVal;
+  if (typeof(a[sortField]) == "function") {
+    aVal = a[sortField]();
+    bVal = b[sortField]();
+  } else {
+    aVal = a[sortField];
+    bVal = b[sortField];
+  }
+  if (aVal < bVal) {
+    return -sortDirection;
+  } else if (aVal == bVal) {
+    return 0;
+  } else {
+    return sortDirection;
+  }
+}
+
+let sortIndicators = {
+  '-1': '\u2193',
+  '1': '\u2191'
+};
+
+function setSortIndicator() {
+  let th = document.getElementById(sortField + "Sort");
+  let content = th.textContent;
+  if (content[content.length - 1] != sortIndicators[sortDirection]) {
+    th.textContent = content + sortIndicators[sortDirection];
+  }
+}
+
+function unsetSortIndicator() {
+  let th = document.getElementById(sortField + "Sort");
+  let content = th.textContent;
+  if (content[content.length - 1] == sortIndicators[sortDirection]) {
+    th.textContent = content.substring(0, content.length - 1);
+  }
+}
+
+function handleSortClick(event) {
+  unsetSortIndicator();
+  let targetSortField = event.target.id.replace(/Sort$/, '');
+  if (targetSortField == sortField) {
+    sortDirection = -sortDirection;
+  } else {
+    sortDirection = 1;
+    sortField = targetSortField;
+  }
+  setSortIndicator();
+  updateTable();
+}
+
 function populateTable() {
   let table = document.getElementById("table");
   for (let i = 0; i < entries.length; i++) {
+    let telemetryIDTD;
+    let nameTD;
     let successCountTD;
     let failureCountTD;
     let tr = document.getElementById("tr" + i);
     if (!tr) {
       tr = document.createElement("tr");
       tr.id = "tr" + i;
-      let nameTD = document.createElement("td");
-      nameTD.textContent = entries[i].name;
+      telemetryIDTD = document.createElement("td");
+      nameTD = document.createElement("td");
       successCountTD = document.createElement("td");
       failureCountTD = document.createElement("td");
+      tr.appendChild(telemetryIDTD);
       tr.appendChild(nameTD);
       tr.appendChild(successCountTD);
       tr.appendChild(failureCountTD);
       table.appendChild(tr);
     } else {
-      successCountTD = tr.childNodes[1];
-      failureCountTD = tr.childNodes[2];
+      telemetryIDTD = tr.childNodes[0];
+      nameTD = tr.childNodes[1];
+      successCountTD = tr.childNodes[2];
+      failureCountTD = tr.childNodes[3];
     }
+    telemetryIDTD.textContent = entries[i].telemetryID;
+    nameTD.textContent = entries[i].name;
     let successes = entries[i].getEnabledSuccesses();
     let failures = entries[i].getEnabledFailures();
     successCountTD.textContent = successes;
@@ -159,15 +225,20 @@ function clearTable() {
     let tr = document.getElementById("tr" + i);
     if (tr) {
       tr.setAttribute("class", "");
-      let successCountTD = tr.childNodes[1];
+      let telemetryIDTD = tr.childNodes[0];
+      telemetryIDTD.textContent = 0;
+      let nameTD = tr.childNodes[1];
+      nameTD.textContent = '';
+      let successCountTD = tr.childNodes[2];
       successCountTD.textContent = 0;
-      let failureCountTD = tr.childNodes[2];
+      let failureCountTD = tr.childNodes[3];
       failureCountTD.textContent = 0;
     }
   }
 }
 
 function updateTable() {
+  entries.sort(compareEntries);
   clearTable();
   populateTable();
 }

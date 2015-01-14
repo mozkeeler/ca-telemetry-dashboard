@@ -14,6 +14,10 @@ tr.someFailures {
   background-color: #FFE15B;
 }
 
+th {
+  cursor: default;
+}
+
 #versions {
   width: 14%;
   float: left;

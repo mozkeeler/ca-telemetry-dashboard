@@ -28,10 +28,11 @@
   </div>
   <table>
     <thead>
-      <tr>
-        <th>CA Name</th>
-        <th>Successful Verifications</th>
-        <th>Pinning Failures</th>
+      <tr onclick="handleSortClick(event);">
+        <th id="telemetryIDSort">Telemetry ID</th>
+        <th id="nameSort">CA Name</th>
+        <th id="getEnabledSuccessesSort">Successful Verifications</th>
+        <th id="getEnabledFailuresSort">Pinning Failures</th>
       </tr>
     </thead>
     <tbody id="table"></tbody>
