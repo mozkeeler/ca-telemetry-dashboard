@@ -5,27 +5,33 @@
   <title>CA Telemetry Dashboard</title>
   <link rel="stylesheet" type="text/css" href="index.css">
   <script src="https://telemetry.mozilla.org/v1/telemetry.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+  <script src="https://code.highcharts.com/stock/highstock.js"></script>
   <script src="index.js" type="application/javascript;version=1.7"></script>
 </head>
-<body>
-  <div>
-    <form id="versions" onchange="updateTable();">
-    </form>
-    <table id="legend">
-      <tr class="noFailures">
-        <td>No pinning failures were observed for the CA</td>
-      </tr>
-      <tr class="unusedCA">
-        <td>The CA has never been observed</td>
-      </tr>
-      <tr class="someFailures">
-        <td>Verification successes and pinning failures have been observed</td>
-      </tr>
-      <tr class="onlyFailures">
-        <td>Only pinning failures have been observed</td>
-      </tr>
-    </table>
-  </div>
+<body onclick="clearChart();">
+  <div id="timeseries"></div>
+  <table>
+    <tr>
+      <td>
+        <table id="legend">
+          <tr class="noFailures">
+            <td>No pinning failures were observed for the CA</td>
+          </tr>
+          <tr class="unusedCA">
+            <td>The CA has never been observed</td>
+          </tr>
+          <tr class="someFailures">
+            <td>Verification successes and pinning failures have been observed</td>
+          </tr>
+          <tr class="onlyFailures">
+            <td>Only pinning failures have been observed</td>
+          </tr>
+        </table>
+      </td>
+      <td><form id="versions" onchange="updateTable();"></form></td>
+    </tr>
+  </table>
   <table>
     <thead>
       <tr onclick="handleSortClick(event);">

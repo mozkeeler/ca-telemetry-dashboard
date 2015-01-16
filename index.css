@@ -18,11 +18,6 @@ th {
   cursor: default;
 }
 
-#versions {
-  width: 14%;
-  float: left;
-}
-
-#legend {
-  margin-left: 14%;
+#timeseries {
+  position: absolute;
 }

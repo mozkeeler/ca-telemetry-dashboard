@@ -33,6 +33,8 @@ function Entry(name, id) {
   this.telemetryID = id;
   this.successCounts = {};
   this.failureCounts = {};
+  this.successCountsByDate = {};
+  this.failureCountsByDate = {};
 }
 
 Entry.prototype = {
@@ -54,6 +56,24 @@ Entry.prototype = {
       }
     }
     return sum;
+  },
+  successCountsByDate: null,
+  failureCountsByDate: null,
+  getEnabledSuccessTimeSeriesData: function() {
+    return this.getEnabledTimeSeriesData(this.successCountsByDate);
+  },
+  getEnabledFailureTimeSeriesData: function() {
+    return this.getEnabledTimeSeriesData(this.failureCountsByDate);
+  },
+  getEnabledTimeSeriesData: function(countMapsByDate) {
+    let data = [];
+    for (let millisString of Object.keys(countMapsByDate)) {
+      let sum = this.getEnabledCount(countMapsByDate[millisString]);
+      data.push([parseInt(millisString), sum]);
+    }
+    return data.sort(function(pair1, pair2) {
+      return pair1[0] - pair2[0];
+    });
   }
 };
 
@@ -90,26 +110,40 @@ function loadMeasures(version) {
 function loadData(version, measure) {
   Telemetry.loadEvolutionOverBuilds(version, measure,
                                     function(histogramEvolution) {
-    let histogram = histogramEvolution.range();
-    histogram.each(function(count, start, end, index) {
-      if (index < roots.maxBin) {
+    histogramEvolution.map(function(date, histogram, unusedIndex) {
+      let millis = date.getTime();
+      histogram.each(function(count, start, end, index) {
+        if (index >= roots.maxBin) {
+          return;
+        }
         if (!entries[index]) {
           entries[index] = new Entry(roots.roots[index].label, index);
         }
         if (measure == "CERT_VALIDATION_SUCCESS_BY_CA") {
-          if (entries[index].successCounts[version]) {
-            throw "re-setting success count?";
+          if (!(version in entries[index].successCounts)) {
+            entries[index].successCounts[version] = 0;
           }
-          entries[index].successCounts[version] = count;
+          entries[index].successCounts[version] += count;
         } else if (measure == "CERT_PINNING_FAILURES_BY_CA") {
-          if (entries[index].failureCounts[version]) {
-            throw "re-setting failure count?";
+          if (!(version in entries[index].failureCounts)) {
+            entries[index].failureCounts[version] = 0;
           }
-          entries[index].failureCounts[version] = count;
+          entries[index].failureCounts[version] += count;
         } else {
           throw "Unknown measure: " + measure;
         }
-      }
+        if (!entries[index].successCountsByDate[millis]) {
+          entries[index].successCountsByDate[millis] = {};
+        }
+        if (!entries[index].failureCountsByDate[millis]) {
+          entries[index].failureCountsByDate[millis] = {};
+        }
+        if (measure == "CERT_VALIDATION_SUCCESS_BY_CA") {
+          entries[index].successCountsByDate[millis][version] = count;
+        } else if (measure == "CERT_PINNING_FAILURES_BY_CA") {
+          entries[index].failureCountsByDate[millis][version] = count;
+        }
+      });
     });
     setSortIndicator();
     updateTable();
@@ -176,7 +210,8 @@ function handleSortClick(event) {
 
 function populateTable() {
   let table = document.getElementById("table");
-  for (let i = 0; i < entries.length; i++) {
+  let i = 0;
+  for (let entry of entries) {
     let telemetryIDTD;
     let nameTD;
     let successCountTD;
@@ -200,10 +235,10 @@ function populateTable() {
       successCountTD = tr.childNodes[2];
       failureCountTD = tr.childNodes[3];
     }
-    telemetryIDTD.textContent = entries[i].telemetryID;
-    nameTD.textContent = entries[i].name;
-    let successes = entries[i].getEnabledSuccesses();
-    let failures = entries[i].getEnabledFailures();
+    telemetryIDTD.textContent = entry.telemetryID;
+    nameTD.textContent = entry.name;
+    let successes = entry.getEnabledSuccesses();
+    let failures = entry.getEnabledFailures();
     successCountTD.textContent = successes;
     failureCountTD.textContent = failures;
     tr.setAttribute("class", "");
@@ -216,6 +251,45 @@ function populateTable() {
     } else if (successes > 0 && failures > 0) {
       tr.setAttribute("class", "someFailures");
     }
+    tr.onclick = function(entry, event) {
+      doChart(entry, event);
+    }.bind(null, entry); // fun with closures
+    i++;
+  }
+}
+
+function doChart(entry, event) {
+  event.stopPropagation();
+  let successData = entry.getEnabledSuccessTimeSeriesData();
+  let failureData = entry.getEnabledFailureTimeSeriesData();
+  new Highcharts.StockChart({
+    chart: {
+      renderTo: "timeseries"
+    },
+    legend: {
+      enabled: true
+    },
+    series: [
+      { data: successData,
+        name: "Successful Verifications"
+      },
+      { data: failureData,
+        name: "Pinning Failures"
+      }
+    ],
+    title: {
+      text: entry.name
+    }
+  });
+  let timeseries = document.getElementById("timeseries");
+  timeseries.style.left = event.layerX + "px";
+  timeseries.style.top = event.layerY + "px";
+}
+
+function clearChart() {
+  let timeseries = document.getElementById("timeseries");
+  while (timeseries.children.length > 0) {
+    timeseries.children[0].remove();
   }
 }
 
