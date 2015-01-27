@@ -18,6 +18,17 @@ th {
   cursor: default;
 }
 
-#timeseries {
+div.absolute {
   position: absolute;
+}
+
+#popup {
+  background: white;
+  border: 1px solid black;
+  padding: 0px 5px;
+  display: none;
+}
+
+p.monospace {
+  font-family: monospace;
 }

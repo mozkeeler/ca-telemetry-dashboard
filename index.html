@@ -9,8 +9,9 @@
   <script src="https://code.highcharts.com/stock/highstock.js"></script>
   <script src="index.js" type="application/javascript;version=1.7"></script>
 </head>
-<body onclick="clearChart();">
-  <div id="timeseries"></div>
+<body onclick="clearChildren('timeseries');">
+  <div id="timeseries" class="absolute"></div>
+  <div id="popup" class="absolute"></div>
   <table>
     <tr>
       <td>

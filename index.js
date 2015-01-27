@@ -1,14 +1,4 @@
-const MAX_CA_NAME_LEN = 50;
-function formatName(name) {
-  let result = name.replace(/_/g, " ");
-  if (result.length > MAX_CA_NAME_LEN) {
-    result = result.substring(0, MAX_CA_NAME_LEN) + "...";
-  }
-  return result;
-}
-
 let roots = null;
-
 let req = new XMLHttpRequest();
 req.open("GET", "KnownRootHashes.json", true);
 req.onreadystatechange = function() {
@@ -28,9 +18,10 @@ let sortDirection = 1;
 // name: the name of the CA in question
 // successCounts: a map of version -> successful validation count
 // failureCounts: a map of version -> pinning failure count
-function Entry(name, id) {
-  this.name = formatName(name);
+function Entry(name, id, hash) {
+  this.name = name.replace(/_/g, " ");
   this.telemetryID = id;
+  this.hash = hash;
   this.successCounts = {};
   this.failureCounts = {};
   this.successCountsByDate = {};
@@ -38,10 +29,32 @@ function Entry(name, id) {
 }
 
 Entry.prototype = {
+  MAX_CA_NAME_LEN: 50,
   name: '',
   telemetryID: -1,
+  hash: '',
   successCounts: null,
   failureCounts: null,
+  getName: function() {
+    let result = this.name;
+    if (result.length > this.MAX_CA_NAME_LEN) {
+      result = result.substring(0, this.MAX_CA_NAME_LEN) + "...";
+    }
+    return result;
+  },
+  getHash: function() {
+    let bytes = atob(this.hash);
+    let hexBytes = [];
+    for (let i = 0; i < bytes.length; i++) {
+      let hexByte = bytes.charCodeAt(i).toString(16);
+      if (hexByte.length != 2) {
+        hexByte = "0" + hexByte;
+      }
+      hexBytes.push(hexByte);
+    }
+    let result = hexBytes.join(':');
+    return result;
+  },
   getEnabledSuccesses: function() {
     return this.getEnabledCount(this.successCounts);
   },
@@ -117,7 +130,8 @@ function loadData(version, measure) {
           return;
         }
         if (!entries[index]) {
-          entries[index] = new Entry(roots.roots[index].label, index);
+          entries[index] = new Entry(roots.roots[index].label, index,
+                                     roots.roots[index].sha256Fingerprint);
         }
         if (measure == "CERT_VALIDATION_SUCCESS_BY_CA") {
           if (!(version in entries[index].successCounts)) {
@@ -236,7 +250,13 @@ function populateTable() {
       failureCountTD = tr.childNodes[3];
     }
     telemetryIDTD.textContent = entry.telemetryID;
-    nameTD.textContent = entry.name;
+    nameTD.textContent = entry.getName();
+    nameTD.onmouseover = function(entry, event) {
+      doPopup(entry, event);
+    }.bind(null, entry); // fun with closures
+    nameTD.onmouseout = function(event) {
+      clearPopup();
+    };
     let successes = entry.getEnabledSuccesses();
     let failures = entry.getEnabledFailures();
     successCountTD.textContent = successes;
@@ -256,6 +276,34 @@ function populateTable() {
     }.bind(null, entry); // fun with closures
     i++;
   }
+}
+
+function clearChildren(elementId) {
+  let element = document.getElementById(elementId);
+  while (element.children.length > 0) {
+    element.children[0].remove();
+  }
+}
+
+function doPopup(entry, event) {
+  clearChildren("popup");
+  let popup = document.getElementById("popup");
+  popup.style.display = "block";
+  popup.style.left = event.layerX + "px";
+  popup.style.top = event.layerY + "px";
+  let nameP = document.createElement("p");
+  nameP.textContent = entry.name;
+  popup.appendChild(nameP);
+  let hashP = document.createElement("p");
+  hashP.setAttribute("class", "monospace");
+  hashP.textContent = entry.getHash();
+  popup.appendChild(hashP);
+}
+
+function clearPopup() {
+  clearChildren("popup");
+  let popup = document.getElementById("popup");
+  popup.style.display = "none";
 }
 
 function doChart(entry, event) {
@@ -278,19 +326,12 @@ function doChart(entry, event) {
       }
     ],
     title: {
-      text: entry.name
+      text: entry.getName()
     }
   });
   let timeseries = document.getElementById("timeseries");
   timeseries.style.left = event.layerX + "px";
   timeseries.style.top = event.layerY + "px";
-}
-
-function clearChart() {
-  let timeseries = document.getElementById("timeseries");
-  while (timeseries.children.length > 0) {
-    timeseries.children[0].remove();
-  }
 }
 
 function clearTable() {
