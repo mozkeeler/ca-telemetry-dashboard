@@ -82,7 +82,9 @@ Entry.prototype = {
     let data = [];
     for (let millisString of Object.keys(countMapsByDate)) {
       let sum = this.getEnabledCount(countMapsByDate[millisString]);
-      data.push([parseInt(millisString), sum]);
+      if (sum > 0) {
+        data.push([parseInt(millisString), sum]);
+      }
     }
     return data.sort(function(pair1, pair2) {
       return pair1[0] - pair2[0];
