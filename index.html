@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <title>CA Telemetry Dashboard</title>
   <link rel="stylesheet" type="text/css" href="index.css">
-  <script src="https://telemetry.mozilla.org/v1/telemetry.js"></script>
+  <script src="https://telemetry.mozilla.org/v2/telemetry.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
   <script src="https://code.highcharts.com/stock/highstock.js"></script>
   <script src="index.js" type="application/javascript;version=1.7"></script>
 </head>
-<body onclick="clearChildren('timeseries');">
+<body onclick="maybeCloseChart(event);">
   <div id="timeseries" class="absolute"></div>
   <div id="popup" class="absolute"></div>
   <table>

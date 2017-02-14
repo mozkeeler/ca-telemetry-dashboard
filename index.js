@@ -16,8 +16,8 @@ let sortField = "telemetryID";
 let sortDirection = 1;
 
 // name: the name of the CA in question
-// successCounts: a map of version -> successful validation count
-// failureCounts: a map of version -> pinning failure count
+// successCounts: a map of versionTuple -> successful validation count
+// failureCounts: a map of versionTuple -> pinning failure count
 function Entry(name, id, hash) {
   this.name = name.replace(/_/g, " ");
   this.telemetryID = id;
@@ -94,80 +94,109 @@ Entry.prototype = {
 
 function initializeTelemetry() {
   Telemetry.init(function() {
-    let versions = Telemetry.versions();
-    for (let version of versions) {
-      loadMeasures(version);
+    let versions = Telemetry.getVersions();
+    for (let versionTuple of versions) {
+      let [channel, version] = versionTuple.split("/");
+      if (parseInt(version, 10) >= 45) {
+        Telemetry.getFilterOptions(channel, version, (filterOptions) => {
+          if (filterOptions.metric.includes("CERT_VALIDATION_SUCCESS_BY_CA") &&
+              filterOptions.metric.includes("CERT_PINNING_FAILURES_BY_CA")) {
+            let versionsForm = document.getElementById("versions");
+            let checkbox = document.createElement("input");
+            checkbox.id = "checkbox-" + versionTuple;
+            checkbox.type = "checkbox";
+            checkbox.value = versionTuple;
+            checkbox.checked = true;
+            versionsForm.appendChild(checkbox);
+            let checkboxText = document.createElement("span");
+            checkboxText.textContent = versionTuple;
+            checkboxText.setAttribute("class", "inProgress");
+            checkboxText.id = "checkboxText-" + versionTuple;
+            versionsForm.appendChild(checkboxText);
+            let linebreak = document.createElement("br");
+            versionsForm.appendChild(linebreak);
+            getEvolution(channel, version, "CERT_VALIDATION_SUCCESS_BY_CA");
+            getEvolution(channel, version, "CERT_PINNING_FAILURES_BY_CA");
+          }
+        });
+      }
     }
   });
 }
 
-function loadMeasures(version) {
-  Telemetry.measures(version, function(measures) {
-    if ("CERT_VALIDATION_SUCCESS_BY_CA" in measures &&
-        "CERT_PINNING_FAILURES_BY_CA" in measures) {
-      let versionsForm = document.getElementById("versions");
-      let checkbox = document.createElement("input");
-      checkbox.id = "checkbox-" + version;
-      checkbox.type = "checkbox";
-      checkbox.value = version;
-      checkbox.checked = true;
-      versionsForm.appendChild(checkbox);
-      let checkboxText = document.createTextNode(version);
-      versionsForm.appendChild(checkboxText);
-      let linebreak = document.createElement("br");
-      versionsForm.appendChild(linebreak);
-      loadData(version, "CERT_VALIDATION_SUCCESS_BY_CA");
-      loadData(version, "CERT_PINNING_FAILURES_BY_CA");
+function getEvolution(channel, version, metric) {
+  let versionTuple = channel + "/" + version;
+  Telemetry.getEvolution(channel, version, metric, {}, true, (evolutionMap) => {
+    let actualEvolutionMap = evolutionMap[""];
+    if (actualEvolutionMap) {
+      let actualEvolutionMapSanitized = actualEvolutionMap.sanitized();
+      if (actualEvolutionMapSanitized) {
+        let numSubmissions = actualEvolutionMapSanitized.submissions().length;
+        actualEvolutionMapSanitized.map(function(histogram, iterationIndex, date) {
+          if (iterationIndex + 1 == numSubmissions) {
+            setDone(versionTuple);
+          }
+          let millis = date.getTime();
+          histogram.map(function(count, start, end, index) {
+            if (index >= roots.maxBin) {
+              return;
+            }
+            if (!entries[index]) {
+              entries[index] = new Entry(roots.roots[index].label, index,
+                                         roots.roots[index].sha256Fingerprint);
+            }
+            if (metric == "CERT_VALIDATION_SUCCESS_BY_CA") {
+              if (!(versionTuple in entries[index].successCounts)) {
+                entries[index].successCounts[versionTuple] = 0;
+              }
+              entries[index].successCounts[versionTuple] += count;
+            } else if (metric == "CERT_PINNING_FAILURES_BY_CA") {
+              if (!(versionTuple in entries[index].failureCounts)) {
+                entries[index].failureCounts[versionTuple] = 0;
+              }
+              entries[index].failureCounts[versionTuple] += count;
+            } else {
+              throw "Unknown metric: " + metric;
+            }
+            if (!entries[index].successCountsByDate[millis]) {
+              entries[index].successCountsByDate[millis] = {};
+            }
+            if (!entries[index].failureCountsByDate[millis]) {
+              entries[index].failureCountsByDate[millis] = {};
+            }
+            if (metric == "CERT_VALIDATION_SUCCESS_BY_CA") {
+              entries[index].successCountsByDate[millis][versionTuple] = count;
+            } else if (metric == "CERT_PINNING_FAILURES_BY_CA") {
+              entries[index].failureCountsByDate[millis][versionTuple] = count;
+            }
+          });
+        });
+      } else {
+        console.error(actualEvolutionMap);
+      }
+    } else {
+      console.error(evolutionMap);
     }
   });
 }
 
-function loadData(version, measure) {
-  Telemetry.loadEvolutionOverBuilds(version, measure,
-                                    function(histogramEvolution) {
-    histogramEvolution.map(function(date, histogram, unusedIndex) {
-      let millis = date.getTime();
-      histogram.each(function(count, start, end, index) {
-        if (index >= roots.maxBin) {
-          return;
-        }
-        if (!entries[index]) {
-          entries[index] = new Entry(roots.roots[index].label, index,
-                                     roots.roots[index].sha256Fingerprint);
-        }
-        if (measure == "CERT_VALIDATION_SUCCESS_BY_CA") {
-          if (!(version in entries[index].successCounts)) {
-            entries[index].successCounts[version] = 0;
-          }
-          entries[index].successCounts[version] += count;
-        } else if (measure == "CERT_PINNING_FAILURES_BY_CA") {
-          if (!(version in entries[index].failureCounts)) {
-            entries[index].failureCounts[version] = 0;
-          }
-          entries[index].failureCounts[version] += count;
-        } else {
-          throw "Unknown measure: " + measure;
-        }
-        if (!entries[index].successCountsByDate[millis]) {
-          entries[index].successCountsByDate[millis] = {};
-        }
-        if (!entries[index].failureCountsByDate[millis]) {
-          entries[index].failureCountsByDate[millis] = {};
-        }
-        if (measure == "CERT_VALIDATION_SUCCESS_BY_CA") {
-          entries[index].successCountsByDate[millis][version] = count;
-        } else if (measure == "CERT_PINNING_FAILURES_BY_CA") {
-          entries[index].failureCountsByDate[millis][version] = count;
-        }
-      });
-    });
-    setSortIndicator();
+function setDone(versionTuple) {
+  let checkboxText = document.getElementById("checkboxText-" + versionTuple);
+  checkboxText.removeAttribute("class");
+  let notDoneYet = false;
+  document.getElementById("versions").childNodes.forEach((child) => {
+    if (child.getAttribute("class") == "inProgress") {
+      notDoneYet = true;
+    }
+  });
+  if (!notDoneYet) {
     updateTable();
-  });
+    setSortIndicator();
+  }
 }
 
-function versionIsEnabled(version) {
-  let checkbox = document.getElementById("checkbox-" + version);
+function versionIsEnabled(versionTuple) {
+  let checkbox = document.getElementById("checkbox-" + versionTuple);
   return checkbox.checked;
 }
 
@@ -284,6 +313,12 @@ function clearChildren(elementId) {
   let element = document.getElementById(elementId);
   while (element.children.length > 0) {
     element.children[0].remove();
+  }
+}
+
+function maybeCloseChart(evt) {
+  if (evt.target == document.body) {
+    clearChildren('timeseries');
   }
 }
 
